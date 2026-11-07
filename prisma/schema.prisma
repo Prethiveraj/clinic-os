@@ -1,0 +1,333 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ClinicStatus {
+  prospect
+  demo
+  live
+  suspended
+  churned
+}
+
+enum SiteStatus {
+  draft
+  live
+  suspended
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  cancelled
+}
+
+enum LeadSource {
+  contact_form
+  click_to_call
+  whatsapp
+}
+
+enum GscVerificationMethod {
+  meta
+  dns_txt
+}
+
+enum GenerationApi {
+  places
+  pagespeed
+  groq
+}
+
+enum UserRole {
+  owner
+  admin
+}
+
+enum BlogPostStatus {
+  pending_approval
+  published
+  rejected
+}
+
+enum NotificationType {
+  blog_draft_ready
+  photo_reminder
+}
+
+enum NotificationChannel {
+  email
+}
+
+model Clinic {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  address       String?
+  phone         String?
+  category      String?
+  googlePlaceId String?  @unique @map("google_place_id")
+  hours         Json?
+  rating        Float?
+  reviewCount   Int?     @map("review_count")
+  photos        Json?
+  status        ClinicStatus @default(prospect)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  siteHealthChecks SiteHealthCheck[]
+  scores           Score[]
+  siteContent      SiteContent?
+  siteSettings     SiteSettings?
+  users            User[]
+  subscriptions    Subscription[]
+  leads            Lead[]
+  generationUsage  GenerationUsage[]
+  reviews          Review[]
+  patients         Patient[]
+  blogPosts        BlogPost[]
+  notifications    NotificationLog[]
+
+  @@map("clinics")
+}
+
+model SiteHealthCheck {
+  id               String   @id @default(cuid())
+  clinicId         String   @map("clinic_id")
+  clinic           Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  hasExistingSite  Boolean  @default(false) @map("has_existing_site")
+  existingSiteUrl  String?  @map("existing_site_url")
+  mobileFriendly   Boolean? @map("mobile_friendly")
+  loadSpeedScore   Int?     @map("load_speed_score")
+  isIndexed        Boolean? @map("is_indexed")
+  conversionChecks Json?    @map("conversion_checks")
+  checkedAt        DateTime @default(now()) @map("checked_at")
+
+  @@index([clinicId])
+  @@map("site_health_checks")
+}
+
+model Score {
+  id            String   @id @default(cuid())
+  clinicId      String   @map("clinic_id")
+  clinic        Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  overallScore  Int      @map("overall_score")
+  subScores     Json     @map("sub_scores")
+  computedAt    DateTime @default(now()) @map("computed_at")
+
+  @@index([clinicId])
+  @@map("scores")
+}
+
+model SiteContent {
+  id            String   @id @default(cuid())
+  clinicId      String   @unique @map("clinic_id")
+  clinic        Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  headline      String
+  aboutCopy     String   @map("about_copy")
+  services      Json
+  seoMeta       Json     @map("seo_meta")
+  jsonLd        Json     @map("json_ld")
+  generatedAt   DateTime @default(now()) @map("generated_at")
+  promptVersion String   @map("prompt_version")
+
+  @@map("site_content")
+}
+
+model SiteSettings {
+  id                    String                  @id @default(cuid())
+  clinicId              String                  @unique @map("clinic_id")
+  clinic                Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  subdomainSlug         String                  @unique @map("subdomain_slug")
+  customDomain          String?                 @unique @map("custom_domain")
+  domainVerified        Boolean                 @default(false) @map("domain_verified")
+  gaMeasurementId       String?                 @map("ga_measurement_id")
+  gscVerificationMethod GscVerificationMethod?   @map("gsc_verification_method")
+  gscVerificationValue  String?                 @map("gsc_verification_value")
+  customHeaderScripts   String?                 @map("custom_header_scripts")
+  customBodyScripts     String?                 @map("custom_body_scripts")
+  status                SiteStatus              @default(draft)
+  blogAutoGenerate      Boolean                 @default(true) @map("blog_auto_generate")
+  photoRemindersEnabled Boolean                 @default(true) @map("photo_reminders_enabled")
+
+  @@map("site_settings")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  role      UserRole @default(owner)
+  clinicId  String?  @map("clinic_id")
+  clinic    Clinic?  @relation(fields: [clinicId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  subscriptions Subscription[]
+  otpCodes      OtpCode[]
+
+  @@map("users")
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identifier String  // email or phone this code was sent to
+  codeHash  String   @map("code_hash")
+  expiresAt DateTime @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([identifier])
+  @@map("otp_codes")
+}
+
+model Subscription {
+  id                     String              @id @default(cuid())
+  userId                 String              @map("user_id")
+  user                   User                @relation(fields: [userId], references: [id])
+  clinicId               String              @map("clinic_id")
+  clinic                 Clinic              @relation(fields: [clinicId], references: [id])
+  razorpayCustomerId     String?             @map("razorpay_customer_id")
+  razorpaySubscriptionId String?             @unique @map("razorpay_subscription_id")
+  planTier               String              @map("plan_tier")
+  status                 SubscriptionStatus  @default(active)
+  currentPeriodEnd       DateTime?           @map("current_period_end")
+  createdAt              DateTime            @default(now()) @map("created_at")
+
+  @@index([clinicId])
+  @@map("subscriptions")
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  clinicId  String     @map("clinic_id")
+  clinic    Clinic     @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  name      String?
+  phone     String?
+  message   String?
+  source    LeadSource
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  patient   Patient?
+
+  @@index([clinicId])
+  @@map("leads")
+}
+
+model PromptTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique // e.g. "site-generation"
+  content   String
+  version   String
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("prompt_templates")
+}
+
+// v2 §1 (reputation management) — clinic's Google reviews, plus an
+// AI-drafted reply the owner edits and posts to Google themselves.
+// No direct-post integration yet (that needs Business Profile API
+// verification) — this is a draft-and-copy workflow.
+model Review {
+  id              String    @id @default(cuid())
+  clinicId        String    @map("clinic_id")
+  clinic          Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  googleReviewId  String    @unique @map("google_review_id")
+  authorName      String    @map("author_name")
+  rating          Int
+  text            String?
+  reviewTime      DateTime  @map("review_time")
+  suggestedReply  String?   @map("suggested_reply")
+  replyGeneratedAt DateTime? @map("reply_generated_at")
+  fetchedAt       DateTime  @default(now()) @map("fetched_at")
+
+  @@index([clinicId])
+  @@map("reviews")
+}
+
+// v2 §3 (minimal retention) — owner manually converts a lead into a patient
+// and updates last_visit_date themselves. No booking-system integration.
+model Patient {
+  id            String    @id @default(cuid())
+  clinicId      String    @map("clinic_id")
+  clinic        Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  leadId        String?   @unique @map("lead_id")
+  lead          Lead?     @relation(fields: [leadId], references: [id])
+  name          String?
+  phone         String?
+  lastVisitDate DateTime? @map("last_visit_date")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([clinicId])
+  @@map("patients")
+}
+
+// SEO blog posts drafted by AI from location-based keywords and real Google
+// search questions. Nothing reaches the public site until the owner approves:
+// the renderer only ever reads status = published.
+model BlogPost {
+  id              String         @id @default(cuid())
+  clinicId        String         @map("clinic_id")
+  clinic          Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  slug            String
+  title           String
+  metaDescription String         @map("meta_description")
+  targetKeyword   String         @map("target_keyword")
+  keywords        Json           // supporting keywords used
+  sourceQuestions Json           @map("source_questions") // search questions the post answers
+  keywordSource   String         @map("keyword_source") // "google_autocomplete" | "template"
+  intro           String
+  sections        Json           // [{ heading, body }]
+  faq             Json           // [{ question, answer }]
+  status          BlogPostStatus @default(pending_approval)
+  promptVersion   String         @map("prompt_version")
+  rejectionNote   String?        @map("rejection_note")
+  generatedAt     DateTime       @default(now()) @map("generated_at")
+  reviewedAt      DateTime?      @map("reviewed_at")
+  reviewedBy      String?        @map("reviewed_by")
+  publishedAt     DateTime?      @map("published_at")
+
+  @@unique([clinicId, slug])
+  @@index([clinicId, status])
+  @@map("blog_posts")
+}
+
+// One row per notification actually attempted, keyed by period so a weekly
+// job that runs twice (retry, manual trigger) never double-sends.
+model NotificationLog {
+  id        String              @id @default(cuid())
+  clinicId  String              @map("clinic_id")
+  clinic    Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  userId    String?             @map("user_id")
+  type      NotificationType
+  channel   NotificationChannel
+  recipient String
+  periodKey String              @map("period_key") // e.g. "2026-W45", or a blog post id
+  delivered Boolean             @default(false)
+  error     String?
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  @@unique([clinicId, recipient, type, periodKey])
+  @@index([clinicId])
+  @@map("notification_log")
+}
+
+model GenerationUsage {
+  id           String        @id @default(cuid())
+  userId       String?       @map("user_id")
+  clinicId     String?       @map("clinic_id")
+  clinic       Clinic?       @relation(fields: [clinicId], references: [id])
+  api          GenerationApi
+  costEstimate Float         @default(0) @map("cost_estimate")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@index([clinicId])
+  @@index([userId])
+  @@map("generation_usage")
+}

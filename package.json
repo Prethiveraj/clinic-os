@@ -1,0 +1,64 @@
+{
+  "name": "clinic-growth-os",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "check:env": "tsx scripts/check-env.ts",
+    "verify:integrations": "tsx scripts/verify-integrations.ts",
+    "test": "node --import tsx --test \"tests/unit/*.test.ts\"",
+    "test:e2e": "tsx tests/e2e/run.ts",
+    "prebuild": "node scripts/prepare-build.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "next": "15.5.29",
+    "next-auth": "4.24.15",
+    "nodemailer": "10.3.1",
+    "razorpay": "^2.9.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.15",
+    "@types/nodemailer": "^6.4.24",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/smtp-server": "^3.5.13",
+    "autoprefixer": "^10.4.20",
+    "dotenv": "^16.6.1",
+    "playwright": "^1.63.0",
+    "postcss": "^8.5.15",
+    "prisma": "^5.18.0",
+    "smtp-server": "^3.21.3",
+    "tailwindcss": "^3.4.10",
+    "tsx": "^4.17.0",
+    "typescript": "^5.5.4"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "overrides": {
+    "next-auth": {
+      "nodemailer": "$nodemailer"
+    },
+    "@auth/core": {
+      "nodemailer": "$nodemailer"
+    },
+    "postcss": "$postcss",
+    "follow-redirects": "^1.16.0",
+    "source-map-js": "^1.2.2"
+  },
+  "engines": {
+    "node": ">=20.9"
+  }
+}

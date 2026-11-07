@@ -1,0 +1,1 @@
+export async function GET(){const base=process.env.NEXTAUTH_URL||'http://localhost:3000';return new Response('User-agent: *\nAllow: /\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /api\nDisallow: /preview\nDisallow: /design-preview\nDisallow: /clinic\nDisallow: /audit\nDisallow: /login\nSitemap: '+base+'/sitemap.xml\n',{headers:{'Content-Type':'text/plain'}});}

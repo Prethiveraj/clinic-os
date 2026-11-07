@@ -1,0 +1,37 @@
+# Caddy reverse proxy config — requirements §2, §8.
+#
+# Two hostname patterns both proxy to the same Next.js app (localhost:3000);
+# the app itself resolves the Host header to a clinic at render time.
+#
+# 1. The app + wildcard subdomains (*.yourbrand.in) — DNS-01 challenge,
+#    since a wildcard cert can't be issued via HTTP-01.
+# 2. Any custom domain an owner connects — on-demand TLS issues a cert the
+#    first time real traffic arrives on that hostname, no manual step per
+#    clinic. Gated by an "ask" endpoint so Caddy only requests certs for
+#    domains we've actually got a verified site_settings row for.
+#
+# The global options block must be the first block in the file.
+{
+	email you@example.com
+
+	# Uncomment and configure a DNS provider plugin for the wildcard cert, e.g.:
+	# acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+	on_demand_tls {
+		ask https://yourbrand.in/api/domains/ask
+	}
+}
+
+# Replace yourbrand.in with the real APP_BASE_DOMAIN once decided (requirements §15).
+yourbrand.in, www.yourbrand.in, *.yourbrand.in {
+	reverse_proxy localhost:3000
+}
+
+# Custom domains — on-demand TLS, ask-endpoint gated (see global block above)
+# so we don't issue certs for arbitrary hostnames someone points at this server.
+:443 {
+	tls {
+		on_demand
+	}
+	reverse_proxy localhost:3000
+}

@@ -1,0 +1,4 @@
+import { createHmac,timingSafeEqual } from 'node:crypto';
+import { requireEnv } from './env';
+export function issueSearchTicket(placeId:string) {const payload=Buffer.from(JSON.stringify({placeId,expires:Date.now()+10*60000})).toString('base64url');return payload+'.'+createHmac('sha256',requireEnv('NEXTAUTH_SECRET')).update(payload).digest('base64url');}
+export function verifySearchTicket(ticket:string,placeId:string) {try{const [payload,sig]=ticket.split('.');const expected=createHmac('sha256',requireEnv('NEXTAUTH_SECRET')).update(payload).digest();const received=Buffer.from(sig,'base64url');if(expected.length!==received.length||!timingSafeEqual(expected,received))return false;const data=JSON.parse(Buffer.from(payload,'base64url').toString());return data.placeId===placeId&&data.expires>Date.now();}catch{return false;}}
